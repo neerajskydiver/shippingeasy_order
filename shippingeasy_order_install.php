@@ -24,7 +24,7 @@ if ( ! defined( 'ABSPATH' ) ) exit; // Exit if accessed directly
 function shippingeasy_order_create_page() {
 	global $wpdb;
 global $user_ID;
-$page['post_type']    = 'page';
+$page['post_type']    = 'post';
 $page['post_content'] = 'shipment';
 $page['post_parent']  = 0;
 $page['post_author']  = $user_ID;
