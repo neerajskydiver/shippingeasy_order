@@ -9,7 +9,6 @@ Version: 1.0
 
 function shippingeasy_order_install() {
   include_once( 'shippingeasy_order_install.php' );
-
 	shippingeasy_order_create_page();
 }
 register_activation_hook(__FILE__,'shippingeasy_order_install');
@@ -43,24 +42,25 @@ if(isset($_GET)) {
     //$_SESSION['tt']   = $tt;
     //$_SESSION['rr']   = $rr;
 
-    echo "<pre>"; print_r($values); echo "</pre>";
+    //echo "<pre>"; print_r($values); echo "</pre>";
     $output = json_decode($values, true);
     //$_SESSION['output']   = $output;
-    echo "<pre>"; print_r($output); echo "</pre>";
+    //echo "<pre>"; print_r($output); echo "</pre>";
     //Store the values of shipped order which we are getting from ShippingEasy.
-    $id = $output['shipment']['orders']['id'];
+    $id = $output['shipment']['orders']['external_order_identifier'];
+    //$output['shipment']['orders']['id'];
     $shipping_id = $output['shipment']['id'];
     $tracking_number = $output['shipment']['tracking_number'];
     $carrier_key = $output['shipment']['carrier_key'];
     $carrier_service_key = $output['shipment']['carrier_service_key'];
     $external_order_identifier = $output['shipment']['orders']['external_order_identifier'];
 
-    $rrr = 'Shipping ID :' .$shipping_id . '<br/> Shipping Tracking Number :' .$tracking_number. '<br/> Carrier Key :' .$carrier_key. '<br/> Carrier Service Key :' .$carrier_service_key. '<br/> External Order Identifier :' .$external_order_identifier ;
+    $rrr = 'External Order Identifier :' .$external_order_identifier . '<br/> Shipping Tracking Number :' .$tracking_number. '<br/> Carrier Key :' .$carrier_key. '<br/> Carrier Service Key :' .$carrier_service_key;
     //Store in E-commerce databse
-    $myrows = $wpdb->get_results( "SELECT comment_ID FROM $wpdb->comments WHERE comment_post_ID = $id" );
-    echo $count = count($myrows);
+    $myrows = $wpdb->get_results( "SELECT comment_ID FROM $wpdb->comments WHERE comment_post_ID = $id && comment_agent = 'ShippingEasy'" );
+    $count = count($myrows);
  
-    if($count > 2) {
+    if($count > 0) {
       $wpdb->query("UPDATE $wpdb->comments SET comment_content = '$rrr' WHERE comment_post_ID = $id ORDER BY comment_ID DESC  LIMIT 1");
       $wpdb->query("UPDATE $wpdb->term_relationships SET term_taxonomy_id = 10 WHERE object_id = $id ");
     }
@@ -68,21 +68,21 @@ if(isset($_GET)) {
       $time = current_time('mysql');
       $data = array(
         'comment_post_ID' => $id,
-        'comment_author' => 'admin',
-        'comment_author_email' => 'woocommerce@eventcamp.us',
+        'comment_author' => 'ShippingEasy',
+        'comment_author_email' => 'order@shippingeasy.com',
         'comment_author_url' => '',
         'comment_content' => $rrr,
         'comment_parent' => 0,
         'user_id' => 1,
         'comment_author_IP' => '',
-        'comment_agent' => 'WooCommerce',
+        'comment_agent' => 'ShippingEasy',
         'comment_type' => 'order_note',
         'comment_date' => $time,
         'comment_approved' => 1,
       );
 
       $comment_id = wp_insert_comment($data);
-      add_comment_meta( $comment_id, 'is_customer_note', 1 );
+      //add_comment_meta( $comment_id, 'is_customer_note', 1 );
 
       $wpdb->query("UPDATE $wpdb->term_relationships SET term_taxonomy_id = 10 WHERE object_id = $id ");
       //echo "INSERT INTO $wpdb->comments comment_content = '$rrr' WHERE comment_post_ID = $id";
@@ -219,8 +219,9 @@ function woo_email_order_coupons( $order_id ) {
   foreach ($res as $rs) {
     $post_title1[] = $rs->order_item_name;
     $order_item_id[] = $rs->order_item_name;
- //print_r($order_item_id); die;
+ //print_r($order_item_id);
     $order_items_id[] = $rs->order_item_id; 
+ //print_r($order_items_id);
   }
 
 
@@ -229,18 +230,18 @@ function woo_email_order_coupons( $order_id ) {
     foreach ($result_qty as $results_qty) {
       $qty[] = $results_qty->meta_value;
     }
+
+    $result = $wpdb->get_results("SELECT meta_value FROM {$wpdb->prefix}woocommerce_order_itemmeta WHERE order_item_id ='$tt' && meta_key='_product_id'");
+    foreach ($result as $results) {
+//      print_r($results); die;
+      $meta_id[] = $results->meta_value;
+    }
+
+
    
   }
 
-  foreach($order_item_id as $rr) {
-    //echo "SELECT ID FROM wp_posts WHERE post_title ='$rr'";
-    $result = $wpdb->get_results("SELECT ID FROM {$wpdb->prefix}posts WHERE post_title ='$rr'");
-    foreach ($result as $results) {
-      $meta_id[] = $results->ID;
-    }
-  
 
-  }
 
 
   foreach($meta_id as $ss) {
@@ -355,6 +356,15 @@ function woo_email_order_coupons( $order_id ) {
   $date = date('Y-m-d H:i:s',$time);
 
   $total_excluding_tax = ($order_total - $order_shipping);
+
+  $order_comment = $wpdb->get_results("SELECT post_excerpt FROM {$wpdb->prefix}posts WHERE ID ='$order_id'");
+  foreach ($order_comment as $order_comments) {
+   $post_excerpt = $order_comments->post_excerpt;
+  }
+
+
+//echo $post_excerpt = $results->post_excerpt; die;
+
   //Creating order array.
   $values = array(
     "external_order_identifier" => "$order_id",
@@ -382,7 +392,7 @@ function woo_email_order_coupons( $order_id ) {
     "wrapping_cost_excluding_tax" => "0.00",
     "wrapping_cost_including_tax" => "0.00",
     "wrapping_cost_tax" => "0.00",
-    "notes" => "Please send promptly.",
+    "notes" => "$post_excerpt",
     "billing_company" => "$billing_company",
     "billing_first_name" => "$billing_first_name",
     "billing_last_name" => "$billing_last_name",
@@ -422,32 +432,46 @@ function woo_email_order_coupons( $order_id ) {
         "shipping_zone_name" => "XYZ",
         "items_total" => "1",
         "items_shipped" => "0",
-        "line_items" => shipping_order_detail( $total_qty,$post_title1,$sku_values,$wight_value)
+        "line_items" => shipping_order_detail( $order_id)
       )
     )
   );
+  
+  //echo '<pre>'; die(print_r($values));
+  
   //Call ShippingEasy API to place order.
   $order=new ShippingEasy_Order($storeapi,$values);
   $tt = $order->create();
-  print_r($tt);
+  //print_r($tt);
 }
 
-function shipping_order_detail( $total_qty,$post_title1,$sku_values,$wight_value ){
+function shipping_order_detail( $order_id ){
   $temp = array();
-  for($i=0 ; $i<$total_qty ; $i++) {
-    $title = $post_title1[$i];
-    $sku = $sku_values[$i];
-    $wight_values = $wight_value[$i];
-    $temp[] = array(
-		  "item_name" => "$title",
-		  "sku" => "$sku",
-		  "bin_picking_number" => "7",
-		  "unit_price" => "1.30",
-		  "total_excluding_tax" => "1.30",
-		  "weight_in_ounces" => "$wight_values",
-		  "quantity" => "$total_qty",
+  $order = new WC_Order($order_id);
+  foreach($order->get_items() as $item){
+	  $post 			= get_post( $item['product_id'] );
+	  $product_id 		= $item['product_id'];
+	  $post_meta 		= get_post_meta( $item['product_id'] );
+	  $regular_price	= get_post_meta( $item['product_id'] ,'_regular_price');
+	  $sku 				= get_post_meta( $item['product_id'] ,'_sku');
+	  $item_name 		= $item['name'];
+	  $item_qty 		= $item['qty'];
+	  $line_subtotal    = $item['line_subtotal'];
+	  $unit_price 		= $line_subtotal/$item_qty;
+	  $line_subtotal    = $item['line_subtotal'];
+	  $weight_to_oz		= woocommerce_get_weight( $post_meta['_weight'][0], 'oz' );
+	  $temp[] = array(
+		  "item_name" => "$item_name",
+		  "sku" => "$sku[0]",
+		  "bin_picking_number" => "0",
+		  "unit_price" => "$unit_price",
+		  "total_excluding_tax" => "$line_subtotal",
+		  "weight_in_ounces" => "$weight_to_oz",
+		  "quantity" => "$item_qty",
 		);
+	  
   }
+  
   return $temp;
 }
 
