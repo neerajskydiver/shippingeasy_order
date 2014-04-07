@@ -26,26 +26,12 @@ register_deactivation_hook(__FILE__,'shippingeasy_order_uninstall');
 
 /*----------Start API Endpoint---------*/
 if(isset($_GET)) {
- // error_reporting(E_ALL);
- // ini_set("display_errors", 1);
+
   //Get the Requested url.
   if($_SERVER['REQUEST_URI'] == '/shipment-callback/') {
-
-    //$values = '{"shipment": {"id":12521,"tracking_number":"ABC123456789","carrier_key":"USPS","carrier_service_key":"First","orders": [{"id":96,"external_order_identifier":"100000120"}]}}';
     $values = file_get_contents('php://input');
-    //$body = @file_get_contents('php://input');
-    //$tt = http_get_request_body($_POST);
-    //$rr = http_get_request_body('php://input');
-    //$_SESSION['values'] = $values;
-    //$_SESSION['post']   = $_POST;
-    //$_SESSION['body']   = $body;
-    //$_SESSION['tt']   = $tt;
-    //$_SESSION['rr']   = $rr;
-
-    //echo "<pre>"; print_r($values); echo "</pre>";
     $output = json_decode($values, true);
-    //$_SESSION['output']   = $output;
-    //echo "<pre>"; print_r($output); echo "</pre>";
+
     //Store the values of shipped order which we are getting from ShippingEasy.
     $id = $output['shipment']['orders']['external_order_identifier'];
     //$output['shipment']['orders']['id'];
@@ -85,12 +71,9 @@ if(isset($_GET)) {
       //add_comment_meta( $comment_id, 'is_customer_note', 1 );
 
       $wpdb->query("UPDATE $wpdb->term_relationships SET term_taxonomy_id = 10 WHERE object_id = $id ");
-      //echo "INSERT INTO $wpdb->comments comment_content = '$rrr' WHERE comment_post_ID = $id";
-      //$wpdb->insert( $table_name, array( 'comment_content' => $rrr )  );
-      //$wpdb->insert( $wpdb->comments, array( 'album' => $_POST['album'], 'artist' => $_POST['artist'] ) );
-      //$wpdb->query("INSERT INTO $wpdb->comments (comment_content) VALUES ('$rrr') WHERE comment_post_ID = $id");
-      //$wpdb->query("UPDATE $wpdb->term_relationships SET term_taxonomy_id = 10 WHERE object_id = $id ");
     }
+    $data = 'Success';
+    return $data;
   }
 }
 
@@ -110,21 +93,6 @@ function baw_create_menu() {
   //call register settings function
   add_action( 'admin_init', 'register_mysettings' );
 }
-
-//Wordpress hook for redirecting after update aur submit the post.
-//add_filter('redirect_post_location', 'redirect_to_post_on_publish_or_save');
-
-//function redirect_to_post_on_publish_or_save($location) {
-  //global $post;
-  //print_r($_POST); die;
-  // Publishing draft or updating published post
-  //if ((isset($_POST['publish']) || isset($_POST['save'])) && preg_match("/post=([0-9]*)/", $location, $match) && $post && $post->ID == $match[1] &&
-    //    (isset($_POST['publish']) || $post->post_status == 'publish') && $pl = get_permalink($post->ID)) {
-
-    //$location = $pl; die('ccccccc');
-  //}
-  //return $location;
-//}
 
 function register_mysettings() {
 
@@ -196,9 +164,6 @@ function woo_email_order_coupons( $order_id ) {
   global $woocommerce;
   global $post;
 
-  error_reporting(E_ALL);
-  ini_set("display_errors", 1);
-
   //Include shippingeasy file.
   include ('shipping_easy-php/lib/ShippingEasy.php');
   //Fetch Customer API Key and Secret Key.
@@ -213,157 +178,73 @@ function woo_email_order_coupons( $order_id ) {
   ShippingEasy::setApiBase($baseurl);
   ShippingEasy::setApiKey($apikey);
   ShippingEasy::setApiSecret($secretkey);
-  
-  //Fetch all the values of related order ID.
-  $res = $wpdb->get_results("SELECT order_item_name,order_item_id FROM {$wpdb->prefix}woocommerce_order_items WHERE order_id='$order_id'");
-  foreach ($res as $rs) {
-    $post_title1[] = $rs->order_item_name;
-    $order_item_id[] = $rs->order_item_name;
- //print_r($order_item_id);
-    $order_items_id[] = $rs->order_item_id; 
- //print_r($order_items_id);
-  }
 
+  $order = new WC_Order($order_id);
+  $temp = array();
+  //echo "<pre>"; print_r($order); echo "</pre>";
 
-  foreach($order_items_id as $tt) {
-    $result_qty = $wpdb->get_results("SELECT meta_value FROM {$wpdb->prefix}woocommerce_order_itemmeta WHERE order_item_id ='$tt' && meta_key='_qty'");
-    foreach ($result_qty as $results_qty) {
-      $qty[] = $results_qty->meta_value;
-    }
+  $billing_company =  $order->billing_company;
+  $billing_first_name =  $order->billing_first_name;
+  $billing_last_name =  $order->billing_last_name;
+  $billing_address =  $order->billing_address_1;
+  $billing_address2 =  $order->billing_address_2;
+  $billing_city =  $order->billing_city;
+  $billing_state =  $order->billing_state;
+  $billing_postcode =  $order->billing_postcode;
+  $billing_country =  $order->billing_country;
+  $billing_email =  $order->billing_email;
+  $billing_phone =  $order->billing_phone;
+  $shipping_company =  $order->shipping_company;
+  $shipping_first_name =  $order->shipping_first_name;
+  $shipping_last_name =  $order->shipping_last_name;
+  $shipping_address =  $order->shipping_address_1;
+  $shipping_address2 =  $order->shipping_address_2;
+  $shipping_city =  $order->shipping_city;
+  $shipping_state =  $order->shipping_state;
+  $shipping_postcode =  $order->shipping_postcode;
+  $shipping_country =  $order->shipping_country;
+  $shipping_method =  $order->shipping_method;
+  $order_total =  $order->order_total;
+  $order_tax =  $order->order_tax;
+  $order_shipping =  $order->order_shipping;
+  $order_shipping_tax =  $order->order_shipping_tax;
+  $cart_discount =  $order->cart_discount;
 
-    $result = $wpdb->get_results("SELECT meta_value FROM {$wpdb->prefix}woocommerce_order_itemmeta WHERE order_item_id ='$tt' && meta_key='_product_id'");
-    foreach ($result as $results) {
-//      print_r($results); die;
-      $meta_id[] = $results->meta_value;
-    }
+  foreach($order->get_items() as $item){
+	  $post 			= get_post( $item['product_id'] );
+	  $product_id 		= $item['product_id'];
+	  $post_meta 		= get_post_meta( $item['product_id'] );
+	  $regular_price	= get_post_meta( $item['product_id'] ,'_regular_price');
+	  $sku 				= get_post_meta( $item['product_id'] ,'_sku');
+	  $item_name 		= $item['name'];
+	  $item_qty 		= $item['qty'];
+	  $line_subtotal    = $item['line_subtotal'];
+	  $unit_price 		= $line_subtotal/$item_qty;
+	  $line_subtotal    = $item['line_subtotal'];
+	  $weight_to_oz		= woocommerce_get_weight( $post_meta['_weight'][0], 'oz' );
 
-
-   
-  }
-
-
-
-
-  foreach($meta_id as $ss) {
-    $weight = $wpdb->get_results("SELECT meta_value FROM {$wpdb->prefix}postmeta WHERE post_id='$ss' && meta_key ='_weight'");
-    foreach ($weight as $weight_kg) {
-      $wight_value[] = $weight_kg->meta_value;
-    }
-
-    $sku = $wpdb->get_results("SELECT meta_value FROM {$wpdb->prefix}postmeta WHERE post_id='$ss' && meta_key ='_sku'");
-    foreach ($sku as $sku_value) {
-      $sku_values[] = $sku_value->meta_value;
-    }
-  }
-
-  $total_qty = count($qty);
-
-  $orders = $wpdb->get_results("SELECT * FROM {$wpdb->prefix}postmeta WHERE post_id='$order_id'");
-  foreach ($orders as $order_detail) {
-    if($order_detail->meta_key == '_billing_company') {
-      $billing_company =  $order_detail->meta_value;
-    }
-    if($order_detail->meta_key == '_billing_first_name') {
-      $billing_first_name =  $order_detail->meta_value;
-    }
-    if($order_detail->meta_key == '_billing_last_name') {
-      $billing_last_name =  $order_detail->meta_value;
-    }
-    if($order_detail->meta_key == '_billing_address_1') {
-      $billing_address =  $order_detail->meta_value;
-    }
-    if($order_detail->meta_key == '_billing_address_2') {
-      $billing_address2 =  $order_detail->meta_value;
-    }
-    if($order_detail->meta_key == '_billing_city') {
-      $billing_city =  $order_detail->meta_value;
-    }
-    if($order_detail->meta_key == '_billing_state') {
-      $billing_state =  $order_detail->meta_value;
-    }
-    if($order_detail->meta_key == '_billing_postcode') {
-      $billing_postcode =  $order_detail->meta_value;
-    }
-    if($order_detail->meta_key == '_billing_country') {
-      $billing_country =  $order_detail->meta_value;
-    }
-
-    if($order_detail->meta_key == '_billing_email') {
-      $billing_email =  $order_detail->meta_value;
-    }
-    if($order_detail->meta_key == '_billing_phone') {
-      $billing_phone =  $order_detail->meta_value;
-    }
-    if($order_detail->meta_key == '_shipping_company') {
-      $shipping_company =  $order_detail->meta_value;
-    }
-    if($order_detail->meta_key == '_shipping_first_name') {
-      $shipping_first_name =  $order_detail->meta_value;
-    }
-    if($order_detail->meta_key == '_shipping_last_name') {
-      $shipping_last_name =  $order_detail->meta_value;
-    }
-    if($order_detail->meta_key == '_shipping_address_1') {
-      $shipping_address =  $order_detail->meta_value;
-    }
-    if($order_detail->meta_key == '_shipping_address_2') {
-      $shipping_address2 =  $order_detail->meta_value;
-    }
-    if($order_detail->meta_key == '_shipping_city') {
-      $shipping_city =  $order_detail->meta_value;
-    }
-    if($order_detail->meta_key == '_shipping_state') {
-      $shipping_state =  $order_detail->meta_value;
-    }
-    if($order_detail->meta_key == '_shipping_postcode') {
-      $shipping_postcode =  $order_detail->meta_value;
-    }
-    if($order_detail->meta_key == '_shipping_country') {
-      $shipping_country =  $order_detail->meta_value;
-    }
-    if($order_detail->meta_key == '_shipping_method') {
-      $shipping_method =  $order_detail->meta_value;
-    }
-    if($order_detail->meta_key == '_cart_discount') {
-      $cart_discount =  $order_detail->meta_value;
-    }
-    if($order_detail->meta_key == '_order_total') {
-      $order_total =  $order_detail->meta_value;
-    }
-    if($order_detail->meta_key == '_order_shipping') {
-      $order_shipping =  $order_detail->meta_value;
-    }
-  }
-
-  $orders1 = $wpdb->get_results("SELECT * FROM {$wpdb->prefix}posts WHERE ID='$order_id'");
-  foreach ($orders1 as $order_detail1) {
-    $post_date = $order_detail1->post_modified;
-    $post_title = $order_detail1->post_title;
-  }
-
-  $term = $wpdb->get_results("SELECT term_taxonomy_id FROM {$wpdb->prefix}term_relationships WHERE object_id='$order_id'");
-  foreach ($term as $term_id) {
-    $term_id = $term_id->term_taxonomy_id;
-  }
-
-  $termname = $wpdb->get_results("SELECT slug FROM {$wpdb->prefix}terms WHERE term_id ='$term_id'");
-  foreach ($termname as $term_status) {
-    $status = $term_status->slug;
+    $temp[] = array(
+		  "item_name" => "$item_name",
+		  "sku" => "$sku[0]",
+		  "bin_picking_number" => "7",
+		  "unit_price" => "$unit_price",
+		  "total_excluding_tax" => "$line_subtotal",
+		  "weight_in_ounces" => "$weight_to_oz",
+		  "quantity" => "$item_qty",
+		);
   }
 
   //Calculate the time.
   $time = time();
   $date = date('Y-m-d H:i:s',$time);
 
-  $total_excluding_tax = ($order_total - $order_shipping);
-
+  $total_excluding_tax = $line_subtotal;
+  $shipping_cost_including_tax = ($order_shipping + $order_shipping_tax);
+ 
   $order_comment = $wpdb->get_results("SELECT post_excerpt FROM {$wpdb->prefix}posts WHERE ID ='$order_id'");
   foreach ($order_comment as $order_comments) {
    $post_excerpt = $order_comments->post_excerpt;
   }
-
-
-//echo $post_excerpt = $results->post_excerpt; die;
 
   //Creating order array.
   $values = array(
@@ -374,16 +255,16 @@ function woo_email_order_coupons( $order_id ) {
     "total_including_tax" => "$order_total",
     "total_excluding_tax" => "$total_excluding_tax",
     "discount_amount" => "$cart_discount",
-    "coupon_discount" => "1.00",
+    "coupon_discount" => "$cart_discount",
     "subtotal_including_tax" => "$order_total",
     "subtotal_excluding_tax" => "$total_excluding_tax",
     "subtotal_excluding_tax" => "$total_excluding_tax",
-    "subtotal_tax" => "$order_shipping",
-    "total_tax" => "$order_shipping",
+    "subtotal_tax" => "$order_tax",
+    "total_tax" => "$order_tax",
     "base_shipping_cost" => "$order_shipping",
-    "shipping_cost_including_tax" => "$order_shipping",
+    "shipping_cost_including_tax" => "$shipping_cost_including_tax",
     "shipping_cost_excluding_tax" => "$order_shipping",
-    "shipping_cost_tax" => "$order_shipping",
+    "shipping_cost_tax" => "$order_shipping_tax",
     "base_handling_cost" => "0.00",
     "handling_cost_excluding_tax" => "0.00",
     "handling_cost_including_tax" => "0.00",
@@ -430,19 +311,20 @@ function woo_email_order_coupons( $order_id ) {
         "handling_cost_tax" => "0.00",
         "shipping_zone_id" => "123",
         "shipping_zone_name" => "XYZ",
-        "items_total" => "1",
+        "items_total" => "$item_qty",
         "items_shipped" => "0",
         "line_items" => shipping_order_detail( $order_id)
       )
     )
   );
   
-  //echo '<pre>'; die(print_r($values));
-  
   //Call ShippingEasy API to place order.
-  $order=new ShippingEasy_Order($storeapi,$values);
-  $tt = $order->create();
-  //print_r($tt);
+  try {
+    $order=new ShippingEasy_Order($storeapi,$values);
+    $order->create();
+  } catch (Exception $e) {
+    echo '<b> Error: ',  $e->getMessage(), "\n </b>";
+  }
 }
 
 function shipping_order_detail( $order_id ){
@@ -487,8 +369,6 @@ add_filter('redirect_post_location', 'page_to_post_on_publish_or_save');
 
 function page_to_post_on_publish_or_save($location) {
   global $post;
- // error_reporting(E_ALL);
- // ini_set("display_errors", 1);
   $order_id = get_post();
   $orderid = $order_id->ID;
   // Publishing draft or updating published post
@@ -505,33 +385,35 @@ function page_to_post_on_publish_or_save($location) {
        $secretkey = get_option('secretkey');
        //Base URL.
        $baseurl = get_option('baseurl');
-  //Store API.
-  $storeapi = get_option('storeapi');
+       //Store API.
+       $storeapi = get_option('storeapi');
        ShippingEasy::setApiBase($baseurl);
        ShippingEasy::setApiKey($apikey);
        ShippingEasy::setApiSecret($secretkey);
 
        //Call ShippingEasy Cancellation API.
-       $cancellation = new ShippingEasy_Cancellation($storeapi,"$orderid");
-       $cancellation->create();
+       try {
+         $cancellation = new ShippingEasy_Cancellation($storeapi,"$orderid");
+         $cancellation->create();
+       } catch (Exception $e) {
+           echo '<b> Error: ',  $e->getMessage(), "\n </b>"; die;
+       }
      }
-    
   }
   return $location;
 }
 
 function woocommerce_view_menu() {
-global $wpdb; 
-$id = $_GET['order'];
-    $myrows = $wpdb->get_results( "SELECT comment_ID FROM wp_comments WHERE comment_post_ID = '$id'" );
-    $count = count($myrows);
-    if($count > 2) {
-   $querystr = "
+  global $wpdb; 
+  $id = $_GET['order'];
+  $myrows = $wpdb->get_results( "SELECT comment_ID FROM wp_comments WHERE comment_post_ID = '$id'" );
+  $count = count($myrows);
+  if($count > 2) {
+    $querystr = "
     SELECT comment_content FROM wp_comments WHERE comment_post_ID = '$id' ORDER BY comment_ID DESC  LIMIT 1 ";
-
- $pageposts = $wpdb->get_results($querystr, OBJECT);
-print_r($pageposts[0]->comment_content);
-}
+    $pageposts = $wpdb->get_results($querystr, OBJECT);
+    print_r($pageposts[0]->comment_content);
+  }
 }
 add_action('woocommerce_view_order', 'woocommerce_view_menu');
 /*-----------------End Call Shipped API------*/
