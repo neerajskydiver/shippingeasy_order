@@ -15,6 +15,7 @@ Installation & usage
 2. Log into wordpress Admin Panel.
 3. Click plugins link and Activate this plugin from plugin list.
 4. Update ShippingEasy API credentials at wp-admin/admin.php?page=shippingeasy_order/shippingeasy_order.php
+5. In your ShippingEasy store setting add callback URL as /wp-content/plugins/shippingeasy_order/api_requests.php
 
 Requirements
 ============
