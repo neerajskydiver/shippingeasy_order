@@ -211,7 +211,7 @@ function woo_email_order_coupons( $order_id ) {
   $cart_discount =  $order->cart_discount;
 
   foreach($order->get_items() as $item){
-	  $post 			= get_post( $item['product_id'] );
+	 // $post 			= get_post( $item['product_id'] );
 	  $product_id 		= $item['product_id'];
 	  $post_meta 		= get_post_meta( $item['product_id'] );
 	  $regular_price	= get_post_meta( $item['product_id'] ,'_regular_price');
@@ -232,7 +232,7 @@ function woo_email_order_coupons( $order_id ) {
 		  "weight_in_ounces" => "$weight_to_oz",
 		  "quantity" => "$item_qty",
 		);
-  }
+  } 
 
   //Calculate the time.
   $time = time();
@@ -316,8 +316,7 @@ function woo_email_order_coupons( $order_id ) {
         "line_items" => shipping_order_detail( $order_id)
       )
     )
-  );
-  
+  ); 
   //Call ShippingEasy API to place order.
   try {
     $order=new ShippingEasy_Order($storeapi,$values);
@@ -331,7 +330,7 @@ function shipping_order_detail( $order_id ){
   $temp = array();
   $order = new WC_Order($order_id);
   foreach($order->get_items() as $item){
-	  $post 			= get_post( $item['product_id'] );
+	  //$post 			= get_post( $item['product_id'] );
 	  $product_id 		= $item['product_id'];
 	  $post_meta 		= get_post_meta( $item['product_id'] );
 	  $regular_price	= get_post_meta( $item['product_id'] ,'_regular_price');
@@ -417,4 +416,3 @@ function woocommerce_view_menu() {
 }
 add_action('woocommerce_view_order', 'woocommerce_view_menu');
 /*-----------------End Call Shipped API------*/
-
