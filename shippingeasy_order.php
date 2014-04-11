@@ -1,85 +1,10 @@
 <?php 
 /* 
 Plugin Name: ShippingEasy 
-Description: Plugin for calculate the weight and place order.
+Description: Plugin to integrate ShippingEasy API.Using this plugin orders will be created in ShippingEasy. When order is shipped and updated in ShippingEasy same will get updated in woocommerce.
 Author: ShippingEasy
-Version: 1.0 
+Version: 1.1
 */
-
-
-function shippingeasy_order_install() {
-  include_once( 'shippingeasy_order_install.php' );
-	shippingeasy_order_create_page();
-}
-register_activation_hook(__FILE__,'shippingeasy_order_install');
-
-function shippingeasy_order_uninstall() {
-  global $wpdb;
-  // Delete post
-  $wpdb->query("DELETE FROM $wpdb->posts WHERE post_title = 'shipment-callback'");
-  delete_option('apikey');
-  delete_option('secretkey');
-  delete_option('baseurl');
-  delete_option('storeapi');
-}
-register_deactivation_hook(__FILE__,'shippingeasy_order_uninstall');
-
-/*----------Start API Endpoint---------*/
-if(isset($_GET)) {
-
-  //Get the Requested url.
-  if($_SERVER['REQUEST_URI'] == '/shipment-callback/') {
-    $values = file_get_contents('php://input');
-    $output = json_decode($values, true);
-
-    //Store the values of shipped order which we are getting from ShippingEasy.
-    $id = $output['shipment']['orders']['external_order_identifier'];
-    //$output['shipment']['orders']['id'];
-    $shipping_id = $output['shipment']['id'];
-    $tracking_number = $output['shipment']['tracking_number'];
-    $carrier_key = $output['shipment']['carrier_key'];
-    $carrier_service_key = $output['shipment']['carrier_service_key'];
-    $external_order_identifier = $output['shipment']['orders']['external_order_identifier'];
-
-    $rrr = 'External Order Identifier :' .$external_order_identifier . '<br/> Shipping Tracking Number :' .$tracking_number. '<br/> Carrier Key :' .$carrier_key. '<br/> Carrier Service Key :' .$carrier_service_key;
-    //Store in E-commerce databse
-    $myrows = $wpdb->get_results( "SELECT comment_ID FROM $wpdb->comments WHERE comment_post_ID = $id && comment_agent = 'ShippingEasy'" );
-    $count = count($myrows);
- 
-    if($count > 0) {
-      $wpdb->query("UPDATE $wpdb->comments SET comment_content = '$rrr' WHERE comment_post_ID = $id ORDER BY comment_ID DESC  LIMIT 1");
-      $wpdb->query("UPDATE $wpdb->term_relationships SET term_taxonomy_id = 10 WHERE object_id = $id ");
-    }
-    else {
-      $time = current_time('mysql');
-      $data = array(
-        'comment_post_ID' => $id,
-        'comment_author' => 'ShippingEasy',
-        'comment_author_email' => 'order@shippingeasy.com',
-        'comment_author_url' => '',
-        'comment_content' => $rrr,
-        'comment_parent' => 0,
-        'user_id' => 1,
-        'comment_author_IP' => '',
-        'comment_agent' => 'ShippingEasy',
-        'comment_type' => 'order_note',
-        'comment_date' => $time,
-        'comment_approved' => 1,
-      );
-
-      $comment_id = wp_insert_comment($data);
-      //add_comment_meta( $comment_id, 'is_customer_note', 1 );
-
-      $wpdb->query("UPDATE $wpdb->term_relationships SET term_taxonomy_id = 10 WHERE object_id = $id ");
-    }
-    $data = 'Success';
-    return $data;
-  }
-}
-
-/*-----------------End API EDndpoint--------------------*/
-
-/*-----------------Start Creating API Setting Form------*/
 
 //Wordpress Hook to create admin menu.
 add_action('admin_menu', 'baw_create_menu');
@@ -87,7 +12,7 @@ add_action('admin_menu', 'baw_create_menu');
 //Function to create menu.
 function baw_create_menu() {
 
-  //create new top-level menu
+  //create menu for ShippingEasy API settings
   add_menu_page('ShippingEasy Plugin Settings', 'SE Settings', 'administrator', __FILE__, 'baw_settings_page',plugins_url('/images/generic.png', __FILE__));
 
   //call register settings function
@@ -144,19 +69,132 @@ function baw_settings_page() {
 </div>
 <?php }
 
-/*-----------------End Creating API Setting Form------*/
+//Shipment callback functionality.
+class Pugs_API_Endpoint{	
+	
+	/** Hook WordPress
+	*	@return void
+	*/
+	public function __construct(){
+		add_filter('query_vars', array($this, 'add_query_vars'), 0);
+		add_action('parse_request', array($this, 'sniff_requests'), 0);
+		add_action('init', array($this, 'add_endpoint'), 0);
+	}	
+	
+	/** Add public query vars
+	*	@param array $vars List of current public query vars
+	*	@return array $vars 
+	*/
+	public function add_query_vars($vars){
+		$vars[] = 'shipment';
+		$vars[] = 'callback';
+		return $vars;
+	}
+	
+	/** Add API Endpoint
+	*	This is where the magic happens - brush up on your regex skillz
+	*	@return void
+	*/
+	public function add_endpoint(){
+		add_rewrite_rule('^shipment/callback','index.php?shipment=1&callback=1','top');
+	}
 
-/*-----------------Start Creating Order------*/
+	/**	Sniff Requests
+	*	This is where we hijack all API requests
+	* 	If $_GET['__api'] is set, we kill WP and serve up pug bomb awesomeness
+	*	@return die if API request
+	*/
+	public function sniff_requests(){
+		global $wp;
+		if(isset($wp->query_vars['shipment'])){
+			$this->handle_request();
+			exit;
+		}
+	}
+	
+	/** Handle Requests
+	*	This is where we send off for an intense pug bomb package
+	*	@return void 
+	*/
+	protected function handle_request(){
+		global $wp;
+    global $wpdb;
+		$pugs = $wp->query_vars['pugs'];
+    $values = file_get_contents('php://input');
+    $wpdb->insert( 
+      "shipping_requests", 
+        array( 
+          'value' => $values,
+          'server' => 1,
+          'request' => 1,
+          'http_response_header' => 1,
+          'http_raw_post_data' => 1
+        )
+    );
+
+    $output = json_decode($values, true);
+
+    //Store the values of shipped order which we are getting from ShippingEasy.
+    $id = $output['shipment']['orders']['external_order_identifier'];
+    //$output['shipment']['orders']['id'];
+    $shipping_id = $output['shipment']['id'];
+    $tracking_number = $output['shipment']['tracking_number'];
+    $carrier_key = $output['shipment']['carrier_key'];
+    $carrier_service_key = $output['shipment']['carrier_service_key'];
+    $external_order_identifier = $output['shipment']['orders']['external_order_identifier'];
+
+    $comment_update = 'External Order Identifier: ' .$external_order_identifier . '<br/> Shipping Tracking Number: ' .$tracking_number. '<br/> Carrier Key: ' .$carrier_key. '<br/> Carrier Service Key: ' .$carrier_service_key;
+
+    //Store in E-commerce databse
+    $myrows = $wpdb->get_results( "SELECT comment_ID FROM $wpdb->comments WHERE comment_post_ID = $id && comment_agent = 'ShippingEasy'" );
+    $count = count($myrows);
+ 
+    if($count > 0) {
+      $wpdb->query("UPDATE $wpdb->comments SET comment_content = '$comment_update' WHERE comment_post_ID = $id ORDER BY comment_ID DESC  LIMIT 1");
+      $wpdb->query("UPDATE $wpdb->term_relationships SET term_taxonomy_id = 10 WHERE object_id = $id ");
+    }
+    else {
+      $time = current_time('mysql');
+      $data = array(
+        'comment_post_ID' => $id,
+        'comment_author' => 'ShippingEasy',
+        'comment_author_email' => 'order@shippingeasy.com',
+        'comment_author_url' => '',
+        'comment_content' => $comment_update,
+        'comment_parent' => 0,
+        'user_id' => 1,
+        'comment_author_IP' => '',
+        'comment_agent' => 'ShippingEasy',
+        'comment_type' => 'order_note',
+        'comment_date' => $time,
+        'comment_approved' => 1,
+      );
+
+      $comment_id = wp_insert_comment($data);
+      add_comment_meta( $comment_id, 'is_customer_note', 1 );
+
+      $wpdb->query("UPDATE $wpdb->term_relationships SET term_taxonomy_id = 10 WHERE object_id = $id ");
+    }
+
+	  	$this->send_response('Order has been updated successfully', json_decode($pugs));
+	}
+	
+	/** Response Handler
+	*	This sends a JSON response to the browser
+	*/
+	protected function send_response($msg, $pugs = ''){
+		$response['message'] = $msg;
+		header('content-type: application/json; charset=utf-8');
+	    echo json_encode($response)."\n";
+	    exit;
+	}
+}
+new Pugs_API_Endpoint();
 
 /**
- * WooCommerce Extra Feature
- * --------------------------
- *
- * Add custom fee to cart automatically
+ * WooCommerce place order in ShippingEasy
  *
  */
-
-
 
 function woo_email_order_coupons( $order_id ) {
   //Initialize global wordpress global variable.
@@ -181,7 +219,6 @@ function woo_email_order_coupons( $order_id ) {
 
   $order = new WC_Order($order_id);
   $temp = array();
-  //echo "<pre>"; print_r($order); echo "</pre>";
 
   $billing_company =  $order->billing_company;
   $billing_first_name =  $order->billing_first_name;
@@ -211,7 +248,7 @@ function woo_email_order_coupons( $order_id ) {
   $cart_discount =  $order->cart_discount;
 
   foreach($order->get_items() as $item){
-	 // $post 			= get_post( $item['product_id'] );
+	  $post 			= get_post( $item['product_id'] );
 	  $product_id 		= $item['product_id'];
 	  $post_meta 		= get_post_meta( $item['product_id'] );
 	  $regular_price	= get_post_meta( $item['product_id'] ,'_regular_price');
@@ -232,7 +269,7 @@ function woo_email_order_coupons( $order_id ) {
 		  "weight_in_ounces" => "$weight_to_oz",
 		  "quantity" => "$item_qty",
 		);
-  } 
+  }
 
   //Calculate the time.
   $time = time();
@@ -316,7 +353,8 @@ function woo_email_order_coupons( $order_id ) {
         "line_items" => shipping_order_detail( $order_id)
       )
     )
-  ); 
+  );
+
   //Call ShippingEasy API to place order.
   try {
     $order=new ShippingEasy_Order($storeapi,$values);
@@ -330,7 +368,7 @@ function shipping_order_detail( $order_id ){
   $temp = array();
   $order = new WC_Order($order_id);
   foreach($order->get_items() as $item){
-	  //$post 			= get_post( $item['product_id'] );
+	  $post 			= get_post( $item['product_id'] );
 	  $product_id 		= $item['product_id'];
 	  $post_meta 		= get_post_meta( $item['product_id'] );
 	  $regular_price	= get_post_meta( $item['product_id'] ,'_regular_price');
@@ -358,12 +396,8 @@ function shipping_order_detail( $order_id ){
 
 add_action( 'woocommerce_thankyou', 'woo_email_order_coupons' );
 
-/*-----------------End Creating Order----------*/
-
-/*-----------------Start Call Shipped API------*/
-
-
-//Cancellation API.
+//ShippingEasy Cancellation API.
+//Woocommerce Hook
 add_filter('redirect_post_location', 'page_to_post_on_publish_or_save');
 
 function page_to_post_on_publish_or_save($location) {
@@ -402,17 +436,15 @@ function page_to_post_on_publish_or_save($location) {
   return $location;
 }
 
-function woocommerce_view_menu() {
-  global $wpdb; 
-  $id = $_GET['order'];
-  $myrows = $wpdb->get_results( "SELECT comment_ID FROM wp_comments WHERE comment_post_ID = '$id'" );
-  $count = count($myrows);
-  if($count > 2) {
-    $querystr = "
-    SELECT comment_content FROM wp_comments WHERE comment_post_ID = '$id' ORDER BY comment_ID DESC  LIMIT 1 ";
-    $pageposts = $wpdb->get_results($querystr, OBJECT);
-    print_r($pageposts[0]->comment_content);
-  }
+
+//Wordpress plugin uninstall hook.
+function shippingeasy_order_uninstall() {
+  global $wpdb;
+  // Delete ShippingEasy API configuration fields.
+  delete_option('apikey');
+  delete_option('secretkey');
+  delete_option('baseurl');
+  delete_option('storeapi');
 }
-add_action('woocommerce_view_order', 'woocommerce_view_menu');
-/*-----------------End Call Shipped API------*/
+register_deactivation_hook(__FILE__,'shippingeasy_order_uninstall');
+
