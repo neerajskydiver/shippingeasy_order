@@ -71,7 +71,7 @@ function baw_settings_page() {
 
 //Shipment callback functionality.
 class Pugs_API_Endpoint{	
-	
+
 	/** Hook WordPress
 	*	@return void
 	*/
@@ -80,7 +80,7 @@ class Pugs_API_Endpoint{
 		add_action('parse_request', array($this, 'sniff_requests'), 0);
 		add_action('init', array($this, 'add_endpoint'), 0);
 	}	
-	
+
 	/** Add public query vars
 	*	@param array $vars List of current public query vars
 	*	@return array $vars 
@@ -90,7 +90,7 @@ class Pugs_API_Endpoint{
 		$vars[] = 'callback';
 		return $vars;
 	}
-	
+
 	/** Add API Endpoint
 	*	This is where the magic happens - brush up on your regex skillz
 	*	@return void
@@ -111,7 +111,7 @@ class Pugs_API_Endpoint{
 			exit;
 		}
 	}
-	
+
 	/** Handle Requests
 	*	This is where we send off for an intense pug bomb package
 	*	@return void 
@@ -141,16 +141,36 @@ class Pugs_API_Endpoint{
     $tracking_number = $output['shipment']['tracking_number'];
     $carrier_key = $output['shipment']['carrier_key'];
     $carrier_service_key = $output['shipment']['carrier_service_key'];
+    $shipment_cost = $output['shipment']['shipment_cost'];
 
     $comment_update = 'Shipping Tracking Number: ' .$tracking_number. '<br/> Carrier Key: ' .$carrier_key. '<br/> Carrier Service Key: ' .$carrier_service_key;
 
     //Store in E-commerce databse
     $myrows = $wpdb->get_results( "SELECT comment_ID FROM $wpdb->comments WHERE comment_post_ID = $id && comment_agent = 'ShippingEasy'" );
     $count = count($myrows);
- 
+
+    $order = new WC_Order($id);
+    $cart_discount =  $order->cart_discount;
+    $order_discount =  $order->order_discount;
+
+    $line_subtotal = 0;
+    foreach($order->get_items() as $item){
+  	  $regular_price 	= get_post_meta( $item['product_id'] ,'_regular_price');
+      $line_subtotal += $regular_price[0];
+    }
+
+    foreach($order->get_tax_totals( ) as $taxes){
+      $total_tax = $taxes->amount;
+    }
+
+    $updated_price = ($line_subtotal + $shipment_cost + $total_tax) - ($cart_discount + $order_discount);
+
+
     if($count > 0) {
       $wpdb->query("UPDATE $wpdb->comments SET comment_content = '$comment_update' WHERE comment_post_ID = $id ORDER BY comment_ID DESC  LIMIT 1");
       $wpdb->query("UPDATE $wpdb->term_relationships SET term_taxonomy_id = 10 WHERE object_id = $id ");
+      $wpdb->query("UPDATE $wpdb->postmeta SET meta_value = $shipment_cost WHERE meta_key = '_order_shipping' && post_id = $id ");
+      $wpdb->query("UPDATE $wpdb->postmeta SET meta_value = $updated_price WHERE meta_key = '_order_total' && post_id = $id ");
     }
     else {
       $time = current_time('mysql');
@@ -173,11 +193,13 @@ class Pugs_API_Endpoint{
       add_comment_meta( $comment_id, 'is_customer_note', 1 );
 
       $wpdb->query("UPDATE $wpdb->term_relationships SET term_taxonomy_id = 10 WHERE object_id = $id ");
+      $wpdb->query("UPDATE $wpdb->postmeta SET meta_value = $shipment_cost WHERE meta_key = '_order_shipping' && post_id = $id ");
+      $wpdb->query("UPDATE $wpdb->postmeta SET meta_value = $updated_price WHERE meta_key = '_order_total' && post_id = $id ");
     }
 
 	  	$this->send_response('Order has been updated successfully', json_decode($pugs));
 	}
-	
+
 	/** Response Handler
 	*	This sends a JSON response to the browser
 	*/
@@ -387,7 +409,7 @@ function shipping_order_detail( $order_id ){
 		  "weight_in_ounces" => "$weight_to_oz",
 		  "quantity" => "$item_qty",
 		);
-	  
+
   }
   
   return $temp;
@@ -428,7 +450,8 @@ function page_to_post_on_publish_or_save($location) {
          $cancellation = new ShippingEasy_Cancellation($storeapi,"$orderid");
          $cancellation->create();
        } catch (Exception $e) {
-           echo '<b> Error: ',  $e->getMessage(), "\n </b>"; die;
+           echo '<b> Error: ',  $e->getMessage(), "\n </b>";
+           exit;
        }
      }
   }
