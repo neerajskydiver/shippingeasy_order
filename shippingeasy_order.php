@@ -13,7 +13,7 @@ add_action('admin_menu', 'baw_create_menu');
 function baw_create_menu() {
 
   //create menu for ShippingEasy API settings
-  add_menu_page('ShippingEasy Plugin Settings', 'SE Settings', 'administrator', __FILE__, 'baw_settings_page',plugins_url('/images/generic.png', __FILE__));
+  add_menu_page('ShippingEasy Plugin Settings', 'ShippingEasy', 'administrator', __FILE__, 'baw_settings_page',plugins_url('/images/generic.png', __FILE__));
 
   //call register settings function
   add_action( 'admin_init', 'register_mysettings' );
@@ -37,29 +37,34 @@ function register_mysettings() {
 function baw_settings_page() {
 ?>
 <div class="wrap">
-<h2>ShippingEasy Setting</h2>
+<h2>ShippingEasy Settings</h2>
 <form method="post" action="options.php">
     <?php settings_fields( 'baw-settings-group' ); ?>
     <?php do_settings_sections( 'baw-settings-group' ); ?>
     <table class="form-table">
         <tr valign="top">
         <th scope="row">Customer API Key</th>
-        <td><input type="text" name="apikey" value="<?php echo get_option('apikey'); ?>" /></td>
+        <td><input style="width:520px" type="text" name="apikey" value="<?php echo get_option('apikey'); ?>" /></td>
         </tr>
          
         <tr valign="top">
         <th scope="row">Customer Secret Key</th>
-        <td><input type="text" name="secretkey" value="<?php echo get_option('secretkey'); ?>" /></td>
+        <td><input style="width:520px" type="text" name="secretkey" value="<?php echo get_option('secretkey'); ?>" /></td>
         </tr>
         
         <tr valign="top">
         <th scope="row">Base URL</th>
-        <td><input type="text" name="baseurl" value="<?php echo get_option('baseurl'); ?>" /></td>
+        <?php if(get_option('baseurl') == '') { ?>
+           <td><input style="width:520px" type="text" name="baseurl" value="https://app.shippingeasy.com" /></td>
+        <?php }
+        else { ?>
+          <td><input style="width:520px" type="text" name="baseurl" value="<?php echo get_option('baseurl'); ?>" /></td>
+        <?php } ?>
         </tr>
 
         <tr valign="top">
         <th scope="row">Store API Key</th>
-        <td><input type="text" name="storeapi" value="<?php echo get_option('storeapi'); ?>" /></td>
+        <td><input style="width:520px" type="text" name="storeapi" value="<?php echo get_option('storeapi'); ?>" /></td>
         </tr>
     </table>
     
@@ -123,7 +128,7 @@ class Pugs_API_Endpoint{
     $values = file_get_contents('php://input');
     $wpdb->insert( 
       "shipping_requests", 
-        array( 
+        array(
           'value' => $values,
           'server' => 1,
           'request' => 1,
@@ -141,7 +146,9 @@ class Pugs_API_Endpoint{
     $tracking_number = $output['shipment']['tracking_number'];
     $carrier_key = $output['shipment']['carrier_key'];
     $carrier_service_key = $output['shipment']['carrier_service_key'];
-    $shipment_cost = $output['shipment']['shipment_cost'];
+    $shipment_cost_cents = $output['shipment']['shipment_cost'];
+    $shipment_cost = ($shipment_cost_cents / 100);
+    //woocommerce_get_weight( $post_meta['_weight'][0], 'oz' );
 
     $comment_update = 'Shipping Tracking Number: ' .$tracking_number. '<br/> Carrier Key: ' .$carrier_key. '<br/> Carrier Service Key: ' .$carrier_service_key;
 
@@ -197,7 +204,7 @@ class Pugs_API_Endpoint{
       $wpdb->query("UPDATE $wpdb->postmeta SET meta_value = $updated_price WHERE meta_key = '_order_total' && post_id = $id ");
     }
 
-	  	$this->send_response('Order has been updated successfully', json_decode($pugs));
+	  		  	$this->send_response('Order has been updated successfully ' .$comment_update, json_decode($pugs));
 	}
 
 	/** Response Handler
@@ -241,6 +248,14 @@ function woo_email_order_coupons( $order_id ) {
   $order = new WC_Order($order_id);
   $temp = array();
 
+  foreach($order->get_items() as $item){
+    $product_id 	   = $item['product_id'];
+    $post_meta 		   = get_post_meta( $item['product_id'] );
+    $check_virtual    =  $post_meta['_virtual'][0];
+    $check_download   =  $post_meta['_downloadable'][0];
+  }
+
+  if($check_virtual == 'no' && $check_download == 'no') {
   $billing_company =  $order->billing_company;
   $billing_first_name =  $order->billing_first_name;
   $billing_last_name =  $order->billing_last_name;
@@ -289,8 +304,10 @@ function woo_email_order_coupons( $order_id ) {
 		  "total_excluding_tax" => "$line_subtotal",
 		  "weight_in_ounces" => "$weight_to_oz",
 		  "quantity" => "$item_qty",
+                  "product_options" => "$option_values",
 		);
   }
+
 
   //Calculate the time.
   $time = time();
@@ -348,8 +365,8 @@ function woo_email_order_coupons( $order_id ) {
         "first_name" => "$shipping_first_name",
         "last_name" => "$shipping_last_name",
         "company" => "$shipping_company",
-        "email" => "charles.crona@okeefe.org",
-        "phone_number" => "637-481-6505",
+        "email" => "$billing_email",
+        "phone_number" => "$billing_phone",
         "residential" => "true",
         "address" => "$shipping_address",
         "address2" => "$shipping_address2",
@@ -357,7 +374,7 @@ function woo_email_order_coupons( $order_id ) {
         "state" => "$shipping_state",
         "city" => "$shipping_city",
         "postal_code" => "$shipping_postcode",
-        "postal_code_plus_4" => "1234",
+        "postal_code_plus_4" => "",
         "country" => "$shipping_country",
         "shipping_method" => "$shipping_method",
         "base_cost" => "10.00",
@@ -377,11 +394,13 @@ function woo_email_order_coupons( $order_id ) {
   );
 
   //Call ShippingEasy API to place order.
+  echo "<pre>"; print_r($values); echo "</pre>";
   try {
     $order=new ShippingEasy_Order($storeapi,$values);
     $order->create();
   } catch (Exception $e) {
     echo '<b> Error: ',  $e->getMessage(), "\n </b>";
+  }
   }
 }
 
@@ -389,29 +408,56 @@ function shipping_order_detail( $order_id ){
   $temp = array();
   $order = new WC_Order($order_id);
   foreach($order->get_items() as $item){
-	  $post 			= get_post( $item['product_id'] );
-	  $product_id 		= $item['product_id'];
-	  $post_meta 		= get_post_meta( $item['product_id'] );
-	  $regular_price	= get_post_meta( $item['product_id'] ,'_regular_price');
-	  $sku 				= get_post_meta( $item['product_id'] ,'_sku');
-	  $item_name 		= $item['name'];
-	  $item_qty 		= $item['qty'];
-	  $line_subtotal    = $item['line_subtotal'];
-	  $unit_price 		= $line_subtotal/$item_qty;
-	  $line_subtotal    = $item['line_subtotal'];
-	  $weight_to_oz		= woocommerce_get_weight( $post_meta['_weight'][0], 'oz' );
-	  $temp[] = array(
-		  "item_name" => "$item_name",
-		  "sku" => "$sku[0]",
-		  "bin_picking_number" => "0",
-		  "unit_price" => "$unit_price",
-		  "total_excluding_tax" => "$line_subtotal",
-		  "weight_in_ounces" => "$weight_to_oz",
-		  "quantity" => "$item_qty",
-		);
+    $post 			= get_post( $item['product_id'] );
+    $product_id 		= $item['product_id'];
+    $post_meta 		= get_post_meta( $item['product_id'] );
+    $regular_price	= get_post_meta( $item['product_id'] ,'_regular_price');
+    $sku 				= get_post_meta( $item['product_id'] ,'_sku');
+    $item_name 		= $item['name'];
+    $item_qty 		= $item['qty'];
+    $line_subtotal    = $item['line_subtotal'];
+    $unit_price 		= $line_subtotal/$item_qty;
+    $line_subtotal    = $item['line_subtotal'];
+    if($post_meta['_weight'][0] == '') {
+      $weight_to_oz = 0.00;
+    }
+    else {
+      $weight_to_oz = woocommerce_get_weight( $post_meta['_weight'][0], 'oz' );
+    }
 
+    $temp[] = array(
+      "item_name" => "$item_name",
+      "sku" => "$sku[0]",
+      "bin_picking_number" => "0",
+      "unit_price" => "$unit_price",
+      "total_excluding_tax" => "$line_subtotal",
+      "weight_in_ounces" => "$weight_to_oz",
+      "quantity" => "$item_qty",
+    );
+
+    if(isset($post_meta['_default_attributes'])) {
+      $product_attr = unserialize($post_meta['_product_attributes'][0]);
+      $product_attr_list = array_keys($product_attr);
+      foreach($product_attr_list as $product_attr_name) {
+        $product_attr_name_key[] = $product_attr[$product_attr_name]['name'];
+      }
+      $attr_count = count($product_attr_name_key);
+      for($i = 0; $i < $attr_count; $i++) {
+        $product_key = $product_attr_name_key[$i];
+        //$option_value .= $product_key . ' - '  .$item[$product_key]. ' / ';
+        $option_value[$product_key] = $item[$product_key];
+      }
+
+      foreach($option_value as $key => $value){
+        $option_value[$key] = $value;
+      }
+      foreach($temp as $temp_arraykey => $temp_arrayvalue) {
+        $temp_arraykey = $temp_arraykey;
+      }
+
+      $temp[$temp_arraykey] = $temp[$temp_arraykey] + $option_value;
+    }
   }
-  
   return $temp;
 }
 
@@ -450,8 +496,7 @@ function page_to_post_on_publish_or_save($location) {
          $cancellation = new ShippingEasy_Cancellation($storeapi,"$orderid");
          $cancellation->create();
        } catch (Exception $e) {
-           echo '<b> Error: ',  $e->getMessage(), "\n </b>";
-           exit;
+           echo '<b> Error: ',  $e->getMessage(), "\n </b>"; die;
        }
      }
   }
@@ -469,4 +514,3 @@ function shippingeasy_order_uninstall() {
   delete_option('storeapi');
 }
 register_deactivation_hook(__FILE__,'shippingeasy_order_uninstall');
-
