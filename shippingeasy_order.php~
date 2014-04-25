@@ -247,23 +247,15 @@ function woo_email_order_coupons( $order_id ) {
 
   $order = new WC_Order($order_id);
   $temp = array();
-  $total_products = count($order->get_items());
+
   foreach($order->get_items() as $item){
     $product_id 	   = $item['product_id'];
     $post_meta 		   = get_post_meta( $item['product_id'] );
-    $check_virtual[]  =  $post_meta['_virtual'][0];
-    $check_download[] =  $post_meta['_downloadable'][0];
+    $check_virtual    =  $post_meta['_virtual'][0];
+    $check_download   =  $post_meta['_downloadable'][0];
   }
 
-  if (in_array("yes", $check_virtual)) {
-    $check_virtuals += 1;
-  }
-  if (in_array("yes", $check_download)) {
-    $check_downloads += 1;
-  }
-  $total_download_product = $check_virtuals + $check_downloads;
-
-  if($total_products > $total_download_product ) {
+  if($check_virtual == 'no' && $check_download == 'no') {
   $billing_company =  $order->billing_company;
   $billing_first_name =  $order->billing_first_name;
   $billing_last_name =  $order->billing_last_name;
@@ -315,6 +307,7 @@ function woo_email_order_coupons( $order_id ) {
                   "product_options" => "$option_values",
 		);
   }
+
 
   //Calculate the time.
   $time = time();
@@ -401,7 +394,7 @@ function woo_email_order_coupons( $order_id ) {
   );
 
   //Call ShippingEasy API to place order.
-
+  echo "<pre>"; print_r($values); echo "</pre>";
   try {
     $order=new ShippingEasy_Order($storeapi,$values);
     $order->create();
@@ -425,17 +418,13 @@ function shipping_order_detail( $order_id ){
     $line_subtotal    = $item['line_subtotal'];
     $unit_price 		= $line_subtotal/$item_qty;
     $line_subtotal    = $item['line_subtotal'];
-    $check_virtual    =  $post_meta['_virtual'][0];
-    $check_download   =  $post_meta['_downloadable'][0];
-
     if($post_meta['_weight'][0] == '') {
       $weight_to_oz = 0.00;
-      //unset($temp[0]['weight_in_ounces']);
     }
     else {
       $weight_to_oz = woocommerce_get_weight( $post_meta['_weight'][0], 'oz' );
     }
-    if($check_virtual == 'no' && $check_download == 'no') {
+
     $temp[] = array(
       "item_name" => "$item_name",
       "sku" => "$sku[0]",
@@ -445,7 +434,7 @@ function shipping_order_detail( $order_id ){
       "weight_in_ounces" => "$weight_to_oz",
       "quantity" => "$item_qty",
     );
-    }
+
     if(isset($post_meta['_default_attributes'])) {
       $product_attr = unserialize($post_meta['_product_attributes'][0]);
       $product_attr_list = array_keys($product_attr);
@@ -465,21 +454,10 @@ function shipping_order_detail( $order_id ){
       foreach($temp as $temp_arraykey => $temp_arrayvalue) {
         $temp_arraykey = $temp_arraykey;
       }
-      $product_options[product_options] = $option_value;
-      //echo "<pre>"; print_r($product_options); echo "</pre>";
-      //echo "<pre>"; print_r($temp); echo "</pre>";
-      $temp[$temp_arraykey] = $temp[$temp_arraykey] + $product_options;
-      //echo "<pre>"; print_r($temp); echo "</pre>"; die;
-    }
-  }
-  $temp_count = count($temp);
-  for($i=0 ; $i<$temp_count ; $i++) {
-    if($temp[$i]['weight_in_ounces'] == 0) {
-      unset($temp[$i]['weight_in_ounces']);
-    }
 
+      $temp[$temp_arraykey] = $temp[$temp_arraykey] + $option_value;
+    }
   }
-  //echo "<pre>"; print_r($temp); echo "</pre>"; die;
   return $temp;
 }
 
@@ -536,4 +514,3 @@ function shippingeasy_order_uninstall() {
   delete_option('storeapi');
 }
 register_deactivation_hook(__FILE__,'shippingeasy_order_uninstall');
-
