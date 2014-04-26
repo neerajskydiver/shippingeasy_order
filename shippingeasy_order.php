@@ -141,14 +141,12 @@ class Pugs_API_Endpoint{
 
     //Store the values of shipped order which we are getting from ShippingEasy.
     $id = $output['shipment']['orders'][0]['external_order_identifier'];
-    //$output['shipment']['orders']['id'];
     $shipping_id = $output['shipment']['id'];
     $tracking_number = $output['shipment']['tracking_number'];
     $carrier_key = $output['shipment']['carrier_key'];
     $carrier_service_key = $output['shipment']['carrier_service_key'];
     $shipment_cost_cents = $output['shipment']['shipment_cost'];
     $shipment_cost = ($shipment_cost_cents / 100);
-    //woocommerce_get_weight( $post_meta['_weight'][0], 'oz' );
 
     $comment_update = 'Shipping Tracking Number: ' .$tracking_number. '<br/> Carrier Key: ' .$carrier_key. '<br/> Carrier Service Key: ' .$carrier_service_key;
 
@@ -430,7 +428,6 @@ function shipping_order_detail( $order_id ){
 
     if($post_meta['_weight'][0] == '') {
       $weight_to_oz = 0.00;
-      //unset($temp[0]['weight_in_ounces']);
     }
     else {
       $weight_to_oz = woocommerce_get_weight( $post_meta['_weight'][0], 'oz' );
@@ -455,7 +452,6 @@ function shipping_order_detail( $order_id ){
       $attr_count = count($product_attr_name_key);
       for($i = 0; $i < $attr_count; $i++) {
         $product_key = $product_attr_name_key[$i];
-        //$option_value .= $product_key . ' - '  .$item[$product_key]. ' / ';
         $option_value[$product_key] = $item[$product_key];
       }
 
@@ -466,10 +462,7 @@ function shipping_order_detail( $order_id ){
         $temp_arraykey = $temp_arraykey;
       }
       $product_options[product_options] = $option_value;
-      //echo "<pre>"; print_r($product_options); echo "</pre>";
-      //echo "<pre>"; print_r($temp); echo "</pre>";
       $temp[$temp_arraykey] = $temp[$temp_arraykey] + $product_options;
-      //echo "<pre>"; print_r($temp); echo "</pre>"; die;
     }
   }
   $temp_count = count($temp);
@@ -479,7 +472,6 @@ function shipping_order_detail( $order_id ){
     }
 
   }
-  //echo "<pre>"; print_r($temp); echo "</pre>"; die;
   return $temp;
 }
 
