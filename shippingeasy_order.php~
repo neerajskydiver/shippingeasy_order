@@ -7,19 +7,19 @@ Version: 1.1
 */
 
 //Wordpress Hook to create admin menu.
-add_action('admin_menu', 'shippingeasy_create_menu');
+add_action('admin_menu', 'baw_create_menu');
 
 //Function to create menu.
-function shippingeasy_create_menu() {
+function baw_create_menu() {
 
   //create menu for ShippingEasy API settings
-  add_menu_page('ShippingEasy Plugin Settings', 'ShippingEasy', 'administrator', __FILE__, 'shippingeasy_settings_page',plugins_url('/images/generic.png', __FILE__));
+  add_menu_page('ShippingEasy Plugin Settings', 'ShippingEasy', 'administrator', __FILE__, 'baw_settings_page',plugins_url('/images/generic.png', __FILE__));
 
   //call register settings function
-  add_action( 'admin_init', 'shippingeasy_register_mysettings' );
+  add_action( 'admin_init', 'register_mysettings' );
 }
 
-function shippingeasy_register_mysettings() {
+function register_mysettings() {
 
  if( isset($_GET['settings-updated']) ) { ?>
     <div id="message" class="updated">
@@ -27,20 +27,20 @@ function shippingeasy_register_mysettings() {
     </div>
  <?php } 
 	//register our settings
-	register_setting( 'shippingeasy-settings-group', 'apikey' );
-	register_setting( 'shippingeasy-settings-group', 'secretkey' );
-	register_setting( 'shippingeasy-settings-group', 'baseurl' );
-	register_setting( 'shippingeasy-settings-group', 'storeapi' );
+	register_setting( 'baw-settings-group', 'apikey' );
+	register_setting( 'baw-settings-group', 'secretkey' );
+	register_setting( 'baw-settings-group', 'baseurl' );
+	register_setting( 'baw-settings-group', 'storeapi' );
 }
 
 //ShippingEast API setting page
-function shippingeasy_settings_page() {
+function baw_settings_page() {
 ?>
 <div class="wrap">
 <h2>ShippingEasy Settings</h2>
 <form method="post" action="options.php">
-    <?php settings_fields( 'shippingeasy-settings-group' ); ?>
-    <?php do_settings_sections( 'shippingeasy-settings-group' ); ?>
+    <?php settings_fields( 'baw-settings-group' ); ?>
+    <?php do_settings_sections( 'baw-settings-group' ); ?>
     <table class="form-table">
         <tr valign="top">
         <th scope="row">Customer API Key</th>
@@ -147,10 +147,6 @@ class Pugs_API_Endpoint{
     $carrier_service_key = $output['shipment']['carrier_service_key'];
     $shipment_cost_cents = $output['shipment']['shipment_cost'];
     $shipment_cost = ($shipment_cost_cents / 100);
-    $line_subtotal = 0;
-    $total_tax = 0;
-    $cart_discount = 0;
-    $order_discount = 0;
 
     $comment_update = 'Shipping Tracking Number: ' .$tracking_number. '<br/> Carrier Key: ' .$carrier_key. '<br/> Carrier Service Key: ' .$carrier_service_key;
 
@@ -162,6 +158,7 @@ class Pugs_API_Endpoint{
     $cart_discount =  $order->cart_discount;
     $order_discount =  $order->order_discount;
 
+    $line_subtotal = 0;
     foreach($order->get_items() as $item){
   	  $regular_price 	= get_post_meta( $item['product_id'] ,'_regular_price');
       $line_subtotal += $regular_price[0];
@@ -225,7 +222,7 @@ new Pugs_API_Endpoint();
  *
  */
 
-function shipping_place_order( $order_id ) {
+function woo_email_order_coupons( $order_id ) {
   //Initialize global wordpress global variable.
   global $wpdb;
   global $woocommerce;
@@ -245,26 +242,19 @@ function shipping_place_order( $order_id ) {
   ShippingEasy::setApiBase($baseurl);
   ShippingEasy::setApiKey($apikey);
   ShippingEasy::setApiSecret($secretkey);
-  $downloads_subtotal = 0;
-  $download_total = 0;
+
   $order = new WC_Order($order_id);
   $temp = array();
   $total_products = count($order->get_items());
   foreach($order->get_items() as $item){
-    //echo "<pre>"; print_r($item); echo "</pre>";
     $product_id 	   = $item['product_id'];
     $post_meta 		   = get_post_meta( $item['product_id'] );
-    //echo "<pre>"; print_r($post_meta); echo "</pre>";
     $check_virtual[]  =  $post_meta['_virtual'][0];
     $check_download[] =  $post_meta['_downloadable'][0];
-    if($post_meta['_virtual'][0] == 'yes' || $post_meta['_downloadable'][0] == 'yes') {
-      $download_total = $item['line_subtotal'];
-      $downloads_subtotal    += $download_total;
-    }
   }
 
   if (in_array("yes", $check_virtual)) {
-    $check_virtuals += 1;    
+    $check_virtuals += 1;
   }
   if (in_array("yes", $check_download)) {
     $check_downloads += 1;
@@ -293,9 +283,7 @@ function shipping_place_order( $order_id ) {
   $shipping_postcode =  $order->shipping_postcode;
   $shipping_country =  $order->shipping_country;
   $shipping_method =  $order->shipping_method;
-  $order_cart_total = $order->order_total;
-  $order_totals = $order_cart_total - $downloads_subtotal ;
-  $order_total =  $order_totals;
+  $order_total =  $order->order_total;
   $order_tax =  $order->order_tax;
   $order_shipping =  $order->order_shipping;
   $order_shipping_tax =  $order->order_shipping_tax;
@@ -410,8 +398,8 @@ function shipping_place_order( $order_id ) {
     )
   );
 
-  //echo "<pre>"; print_r($values); echo "</pre>"; die;
   //Call ShippingEasy API to place order.
+
   try {
     $order=new ShippingEasy_Order($storeapi,$values);
     $order->create();
@@ -487,7 +475,7 @@ function shipping_order_detail( $order_id ){
   return $temp;
 }
 
-add_action( 'woocommerce_thankyou', 'shipping_place_order' );
+add_action( 'woocommerce_thankyou', 'woo_email_order_coupons' );
 
 //ShippingEasy Cancellation API.
 //Woocommerce Hook
@@ -540,5 +528,4 @@ function shippingeasy_order_uninstall() {
   delete_option('storeapi');
 }
 register_deactivation_hook(__FILE__,'shippingeasy_order_uninstall');
-
 
