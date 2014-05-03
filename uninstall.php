@@ -7,7 +7,7 @@
  * @author 		WooThemes
  * @category 	Core
  * @package 	WooCommerce/Uninstaller
- * @version     1.6.4
+ * @version     1.2
  */
   error_reporting(E_ALL);
   ini_set("display_errors", 1);
