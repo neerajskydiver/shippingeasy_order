@@ -3,7 +3,7 @@
 Plugin Name: ShippingEasy 
 Description: Plugin to integrate ShippingEasy API.Using this plugin orders will be created in ShippingEasy. When order is shipped and updated in ShippingEasy same will get updated in woocommerce.
 Author: ShippingEasy
-Version: 1.1
+Version: 1.2
 */
 
 //Wordpress Hook to create admin menu.
